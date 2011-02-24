@@ -18,9 +18,11 @@
 package org.langkit.tagger.cli;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -38,18 +40,18 @@ import org.langkit.tagger.wordhandler.WordHandler;
 public class Tag {
 	private static String join(Collection<String> strings, String delimiter) {
 		StringBuilder sb = new StringBuilder();
-		
+
 		Iterator<String> iter = strings.iterator();
 		while (iter.hasNext()) {
 			sb.append(iter.next());
 			if (iter.hasNext())
 				sb.append(delimiter);
 		}
-		
+
 		return sb.toString();
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws UnsupportedEncodingException {
 		if (args.length != 2) {
 			System.out.println("Tag lexicon ngrams");
 			System.exit(1);
@@ -58,45 +60,50 @@ public class Tag {
 		// Load the model.
 		Model model = null;
 		try {
-			model = Model.readModel(new BufferedReader(new FileReader(args[0])),
-					new BufferedReader(new FileReader(args[1])));
+			model = Model.readModel(new BufferedReader(new InputStreamReader(
+					new FileInputStream(args[0]), "UTF8")), new BufferedReader(
+					new FileReader(args[1])));
 		} catch (IOException e) {
 			System.out.println("Unable to read the model!");
 			e.printStackTrace();
 			System.exit(1);
 		}
 
-		// Set up word handlers. The suffix word handler is used as a fallback of the
+		// Set up word handlers. The suffix word handler is used as a fallback
+		// of the
 		// known word handler.
-		SuffixWordHandler swh = new SuffixWordHandler(model.lexicon(), model.uniGrams(),
-				2, 5, 10, 10, 10);
-		WordHandler wh = new KnownWordHandler(model.lexicon(), model.uniGrams(), swh);
-		
+		SuffixWordHandler swh = new SuffixWordHandler(model.lexicon(),
+				model.uniGrams(), 2, 5, 10, 10, 10);
+		WordHandler wh = new KnownWordHandler(model.lexicon(),
+				model.uniGrams(), swh);
+
 		// Create an n-gram language model.
 		LanguageModel lm = new LinearInterpolationLM(model.uniGrams(),
 				model.biGrams(), model.triGrams());
 
 		// Initialize a tagger with a beam of 1000.0.
 		HMMTagger tagger = new HMMTagger(model, wh, lm, 1000.0);
-		
-		// Read from the standard input, and print tags for the input to the standard
+
+		// Read from the standard input, and print tags for the input to the
+		// standard
 		// output.
-		BufferedReader reader =  new BufferedReader(new InputStreamReader(System.in));
+		BufferedReader reader = new BufferedReader(new InputStreamReader(
+				System.in, "UTF8"));
 		String line = null;
 		try {
 			while ((line = reader.readLine()) != null) {
-				String tokens[] = line.split("\\s+");
-				List<String> tokenList = new ArrayList<String>(Arrays.asList(tokens));
-				
+				String tokens[] = line.split("\\s+");			
+				List<String> tokenList = new ArrayList<String>(
+						Arrays.asList(tokens));
+
 				// Add start/end markers.
 				tokenList.add(0, "<START>");
 				tokenList.add(0, "<START>");
 				tokenList.add("<END>");
-				
-				List<String> tags =
-					HMMTagger.highestProbabilitySequence(tagger.viterbi(tokenList),
-						model).sequence();
-				
+
+				List<String> tags = HMMTagger.highestProbabilitySequence(
+						tagger.viterbi(tokenList), model).sequence();
+
 				System.out.println(join(tags.subList(2, tags.size() - 1), " "));
 			}
 		} catch (IOException e) {
